@@ -3,25 +3,26 @@ use macroquad::{prelude::*};
 mod ray_casting;
 mod utils;
 
-static SCREEN_WIDTH: f32 = 1600.0;
-static SCREEN_HEIGHT: f32 = 900.0;
-
-static WIDTH: f32 = 9.0;
-static HEIGHT: f32 = 9.0;
-
+pub struct Player {
+    position: Vec2,
+    camera_angle: f32,
+    ray_resolution: f32,
+    fov: f32
+}
 
 #[macroquad::main("MyGame")]
 async fn main() {
 
-    request_new_screen_size(SCREEN_WIDTH, SCREEN_HEIGHT);
-    
-    let mut x: f32 = WIDTH/2.0;
-    let mut y: f32 = HEIGHT/2.0;
+    request_new_screen_size(utils::SCREEN_WIDTH, utils::SCREEN_HEIGHT);
+    let mut player: Player = Player {
+        position: Vec2::new(utils::WIDTH/2., utils::HEIGHT/2.),
+        camera_angle: 0.,
+        ray_resolution: 200.,
+        fov: 3.1415/3.
+    };
 
-    let mut camera_angle: f32 = 0.0;
-    let mut x_resolution: f32 = 200.0;
-    let mut fov: f32 = 3.1415/3.0;
     let mut mouse_lock: bool = false;
+    let mut show_fps: bool = false;
     let delta_time: f32 = get_frame_time();
 
     let wall_texture: Texture2D = load_texture("src/wall_texture.png").await.unwrap();
@@ -29,13 +30,18 @@ async fn main() {
 
     loop {
         clear_background(BLACK);
+        
+        draw_rectangle(0.0, utils::SCREEN_HEIGHT/2.0, utils::SCREEN_WIDTH, utils::SCREEN_HEIGHT/2.0, Color::new(0.15, 0.15, 0.15, 1.));
 
-        draw_rectangle(0.0, SCREEN_HEIGHT/2.0, SCREEN_WIDTH, SCREEN_HEIGHT/2.0, Color::new(0.15, 0.15, 0.15, 1.));
-        ray_casting::scatter_rays(&x, &y, &camera_angle, &fov, &x_resolution, &wall_texture);
+        ray_casting::scatter_rays(&player, &wall_texture);
 
-        utils::update_key_input(&delta_time, &mut x, &mut y, &mut camera_angle, &mut fov, &mut x_resolution,&mut mouse_lock);
+        if show_fps {
+            draw_fps();
+        }
+
+        utils::update_key_input(&mut player, &mut mouse_lock, &mut show_fps);
         if mouse_lock {
-            utils::update_mouse_input(&delta_time, &mut camera_angle);
+            utils::update_mouse_input(&delta_time, &mut player);
         }
 
         next_frame().await;
