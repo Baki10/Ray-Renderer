@@ -1,115 +1,138 @@
 use macroquad::{prelude::*};
-use crate::utils as utils;
+use crate::{Player, utils as utils};
 
 static SCREEN_WIDTH: f32 = 1600.0;
 static SCREEN_HEIGHT: f32 = 900.0;
 
 static VIEW_DISTANCE: f32 = 9.0;
 
-pub fn scatter_rays(x: &f32, y: &f32, camera_angle: &f32, fov: &f32, x_resolution: &f32, wall_texture: &Texture2D) {
+struct Ray {
+    position: Vec2,
+    step: Vec2
+}
 
-    let w: f32 = SCREEN_WIDTH/x_resolution;
-    for index in 0..*x_resolution as usize {
+impl Ray {
+    fn next_step(&mut self) {
+        self.position.x += self.step.x;
+        self.position.y += self.step.y;
+    }
+}
 
-        let angle_offset: f32 = (index as f32 - ((*x_resolution/2.0) as i32) as f32)*fov/(*x_resolution);
-        let ray_angle: f32 = *camera_angle + angle_offset;
-        let ray_data: (f32, f32) = ray(&x, &y, &ray_angle);
-        let distance: f32 = ray_data.0*f32::cos(angle_offset);
+pub fn scatter_rays(player: &Player, wall_texture: &Texture2D) {
+    
+    let segment_width: f32 = SCREEN_WIDTH/player.ray_resolution;
 
-        if distance <= 0.0 {
+    for ray_index in 0..player.ray_resolution as usize {
+
+        let angle_segment: f32 = player.fov/player.ray_resolution;
+        let angle_offset: f32 = (ray_index as f32 - player.ray_resolution/2.0) * angle_segment;
+        let ray_angle: f32 = player.camera_angle + angle_offset;
+
+
+        let (distance, texture_displacement): (f32, f32) = ray(&player.position, &ray_angle);
+        let normal_distance: f32 = distance*f32::cos(angle_offset);
+
+        if normal_distance <= 0.0 {
             continue;
         }
 
-        let distance_ratio: f32 = VIEW_DISTANCE/distance;
-        let h: f32 = SCREEN_HEIGHT/7.0*distance_ratio;
+        let distance_ratio: f32 = VIEW_DISTANCE/normal_distance;
+        let segment_height: f32 = SCREEN_HEIGHT/7.0*distance_ratio;
 
-        let pos_x: f32 = (index as f32)*w;
-        let pos_y: f32 = (SCREEN_HEIGHT - h)/2.0;
+        let texture_position: Vec2 = Vec2 {
+            x: (ray_index as f32)*segment_width,
+            y: (SCREEN_HEIGHT - segment_height)/2.0,
+        };
 
-        let row_color: Color = Color::new(1.5/(distance), 1.5/(distance), 1.5/(distance), 1.0);
+        let row_color: Color = Color {
+            r: 1.5/(normal_distance),
+            g: 1.5/(normal_distance), 
+            b: 1.5/(normal_distance), 
+            a: 1.0,
+        };
 
-        //draw_rectangle(pos_x, pos_y, w, h, row_color);
-        draw_texture_sample(&wall_texture, pos_x, pos_y, row_color, ray_data.1, h, w);
+        draw_texture_sample(&wall_texture, texture_position, row_color, texture_displacement, segment_height, segment_width);
 
     }
 
 }
 
 
-pub fn ray(x: &f32, y: &f32, ray_angle: &f32) -> (f32, f32) {
-    let mut ray_x: f32 = *x;
-    let mut ray_y: f32 = *y;
-    
-    let iterations: i32 = 150;
+pub fn ray(position: &Vec2, ray_angle: &f32) -> (f32, f32) {
+ 
+    let mut iterations: f32 = 150.;
 
-    let ray_dx: f32 = f32::cos(*ray_angle)*(VIEW_DISTANCE/(iterations as f32));
-    let ray_dy: f32 = f32::sin(*ray_angle)*(VIEW_DISTANCE/(iterations as f32));
+    let mut ray: Ray = Ray {
+        position: *position,
+        step: Vec2 {
+            x: f32::cos(*ray_angle) * (VIEW_DISTANCE / iterations),
+            y: f32::sin(*ray_angle) * (VIEW_DISTANCE / iterations)
+        }
 
-    let texture_displacement: f32 = draw_ray(&mut ray_x, &mut ray_y, &ray_dx, &ray_dy, 0, &iterations);
+    };
 
+    let texture_displacement: f32 = draw_ray(&mut ray, &mut iterations);
 
-    //draw_ray(&mut ray_x, &mut ray_y, &ray_dx, &ray_dy, 0, &iterations);
-    if ray_x < 0.0 {
+    if ray.position.x < 0. {
         return (-1., -1.);
     }
 
-    ray_x = *x-ray_x;
-    ray_y = *y-ray_y;
+    let dx: f32 = position.x - ray.position.x;
+    let dy: f32 = position.y - ray.position.y;
+    let ray_distance: f32 = f32::sqrt(dx*dx + dy*dy);
 
-
-    return (f32::sqrt(ray_x*ray_x + ray_y*ray_y), texture_displacement);
+    return (ray_distance, texture_displacement);
 }
 
-fn draw_ray(ray_x: &mut f32, ray_y: &mut f32, ray_dx: &f32, ray_dy: &f32, iteration_index: i32, iterations: &i32) -> f32 {
-    if iteration_index > *iterations {
-        *ray_x = - 1000.0;
+fn draw_ray(ray: &mut Ray, iterations: &mut f32) -> f32 {
+
+    if *iterations <= 0. {
+        ray.position.x = -1000.0;
         return -100.;
     }
 
-    let wall_data: (bool, f32, f32) = utils::is_wall(ray_x, ray_y);
+    let (is_wall, wall_position): (bool, Vec2) = utils::is_wall(&ray.position);
 
-
-
-    if wall_data.0 {
-        let wall_normal: (f32, f32) = get_wall_normal(&ray_x, &ray_y, &wall_data.1, &wall_data.2);
-        let displacement: f32 = get_texture_displacement(&wall_normal, ray_x, ray_y, &wall_data.1, &wall_data.2);
+    if is_wall {
+        let wall_normal: Vec2 = get_wall_normal(&ray.position, &wall_position);
+        let displacement: f32 = get_texture_displacement(wall_normal, &ray.position, wall_position);
         return displacement;
     }
 
-    *ray_x+=*ray_dx;
-    *ray_y+=*ray_dy;
+    ray.next_step();
 
-    return draw_ray(ray_x, ray_y, ray_dx, ray_dy, iteration_index+1, iterations);
+    *iterations-=1.;
+    return draw_ray(ray, iterations);
 }
 
-fn draw_texture_sample(texture: &Texture2D, x: f32, y: f32, color: Color, displacement: f32, texture_height: f32, texture_width: f32) {
-    draw_texture_ex(&texture, x, y, color, DrawTextureParams { 
+fn draw_texture_sample(texture: &Texture2D, position: Vec2, color: Color, displacement: f32, texture_height: f32, texture_width: f32) {
+    draw_texture_ex(&texture, position.x, position.y, color, DrawTextureParams { 
         dest_size: Some(vec2(texture_width, texture_height)), source: Some(Rect::new(displacement*texture.width(), 0., texture_width, texture.height())),..Default::default() });
 }
 
-fn get_texture_displacement(wall_normal: &(f32,f32), ray_x: &f32, ray_y: &f32, wall_x: &f32, wall_y: &f32) -> f32 {
+fn get_texture_displacement(wall_normal: Vec2, ray_position: &Vec2, wall_position: Vec2) -> f32 {
     let mut displacement: f32 = 0.;
 
-    if wall_normal.0 == 0. {
-        displacement = *ray_x-(*wall_x);
-    } else if wall_normal.1 == 0. {
-        displacement = *ray_y-(*wall_y);
+    if wall_normal.x == 0. {
+        displacement = ray_position.x-wall_position.x;
+    } else if wall_normal.y == 0. {
+        displacement = ray_position.y-wall_position.y;
     }
 
     return displacement;
 }
 
-fn get_wall_normal(ray_x: &f32, ray_y: &f32, wall_x: &f32, wall_y: &f32) -> (f32,f32) {
+fn get_wall_normal(ray_position: &Vec2, wall_position: &Vec2) -> Vec2 {
 
-    let mut normal: (f32, f32) = (0.,0.);
+    let mut normal: Vec2 = Vec2::new(0., 0.);
 
-    let distance_x: f32 = *ray_x-(*wall_x+0.5);
-    let distance_y: f32 = *ray_y-(*wall_y+0.5);
+    let distance_x: f32 = ray_position.x - (wall_position.x + 0.5);
+    let distance_y: f32 = ray_position.y - (wall_position.y + 0.5);
 
     if distance_x.abs() > distance_y.abs() {
-        normal.0 = distance_x/distance_x.abs();
+        normal.x = distance_x/distance_x.abs();
     } else {
-        normal.1 = distance_y/distance_y.abs();
+        normal.y = distance_y/distance_y.abs();
     }
 
     return normal;
