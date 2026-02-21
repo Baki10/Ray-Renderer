@@ -1,11 +1,6 @@
 use macroquad::{prelude::*};
 use crate::{Player, utils as utils};
 
-static SCREEN_WIDTH: f32 = 1600.0;
-static SCREEN_HEIGHT: f32 = 900.0;
-
-static VIEW_DISTANCE: f32 = 9.0;
-
 struct Ray {
     position: Vec2,
     step: Vec2
@@ -20,7 +15,7 @@ impl Ray {
 
 pub fn scatter_rays(player: &Player, wall_texture: &Texture2D) {
     
-    let segment_width: f32 = SCREEN_WIDTH/player.ray_resolution;
+    let segment_width: f32 = utils::SCREEN_WIDTH/player.ray_resolution;
 
     for ray_index in 0..player.ray_resolution as usize {
 
@@ -36,12 +31,12 @@ pub fn scatter_rays(player: &Player, wall_texture: &Texture2D) {
             continue;
         }
 
-        let distance_ratio: f32 = VIEW_DISTANCE/normal_distance;
-        let segment_height: f32 = SCREEN_HEIGHT/7.0*distance_ratio;
+        let distance_ratio: f32 = utils::VIEW_DISTANCE/normal_distance;
+        let segment_height: f32 = utils::SCREEN_HEIGHT/7.0*distance_ratio;
 
         let texture_position: Vec2 = Vec2 {
             x: (ray_index as f32)*segment_width,
-            y: (SCREEN_HEIGHT - segment_height)/2.0,
+            y: (utils::SCREEN_HEIGHT - segment_height)/2.0,
         };
 
         let row_color: Color = Color {
@@ -65,8 +60,8 @@ pub fn ray(position: &Vec2, ray_angle: &f32) -> (f32, f32) {
     let mut ray: Ray = Ray {
         position: *position,
         step: Vec2 {
-            x: f32::cos(*ray_angle) * (VIEW_DISTANCE / iterations),
-            y: f32::sin(*ray_angle) * (VIEW_DISTANCE / iterations)
+            x: f32::cos(*ray_angle) * (utils::VIEW_DISTANCE / iterations),
+            y: f32::sin(*ray_angle) * (utils::VIEW_DISTANCE / iterations),
         }
 
     };

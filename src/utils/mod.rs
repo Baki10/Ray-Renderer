@@ -3,14 +3,17 @@ use macroquad::{prelude::*};
 
 use crate::Player;
 
+pub static WIDTH: f32 = 9.0;
+pub static HEIGHT: f32 = 9.0;
+pub static SCREEN_WIDTH: f32 = 1600.0;
+pub static SCREEN_HEIGHT: f32 = 900.0;
 
-static WIDTH: f32 = 9.0;
-static HEIGHT: f32 = 9.0;
+pub static SPEED: f32 = 0.8;
+pub static SENSITIVITY: f32 = 50.0;
+pub static VIEW_DISTANCE: f32 = 9.0;
+pub static RIGHT_ANGLE: f32 = 3.1415/2.;
 
-static SPEED: f32 = 0.8;
-static SENSITIVITY: f32 = 50.0;
-static RIGHT_ANGLE: f32 = 3.1415/2.;
-static MAP: [[&str; WIDTH as usize]; HEIGHT as usize] =                [["#","#","#","#","#","#","#","#","#"],
+pub static MAP: [[&str; WIDTH as usize]; HEIGHT as usize] =            [["#","#","#","#","#","#","#","#","#"],
                                                                         ["#"," "," "," "," "," "," "," ","#"],
                                                                         ["#"," ","#","#"," "," "," "," ","#"],
                                                                         ["#"," ","#"," "," "," "," "," ","#"],
@@ -40,60 +43,39 @@ pub fn is_wall(position: &Vec2) -> (bool, Vec2) {
     return (false, Vec2::new(-1.,-1.));
 }
 
-pub fn update_key_input(player: &mut Player, mouse_lock: &mut bool) {
+pub fn update_key_input(player: &mut Player, mouse_lock: &mut bool, show_fps: &mut bool) {
 
-    let delta_time: f32 = get_frame_time();
-    if is_key_down(KeyCode::W) {
-        
-        let new_x: f32 = player.position.x + f32::cos(player.camera_angle) * SPEED*delta_time;
-        let new_y: f32 = player.position.y + f32::sin(player.camera_angle) * SPEED*delta_time;
-
-        if !is_wall(&Vec2::new(new_x, new_y)).0 {
-            player.position.x = new_x;
-            player.position.y = new_y;
-        }
-
-    }
-
-    if is_key_down(KeyCode::S) {
-
-        let new_x: f32 = player.position.x - f32::cos(player.camera_angle) * SPEED*delta_time;
-        let new_y: f32 = player.position.y - f32::sin(player.camera_angle) * SPEED*delta_time;
-
-        if !is_wall(&Vec2::new(new_x, new_y)).0 {
-            player.position.x = new_x;
-            player.position.y = new_y;
-        }
-
-    }
-    if is_key_down(KeyCode::A) {
-
-        let new_x: f32 = player.position.x + f32::cos(player.camera_angle - RIGHT_ANGLE) * SPEED*delta_time;
-        let new_y: f32 = player.position.y + f32::sin(player.camera_angle - RIGHT_ANGLE) * SPEED*delta_time;
-
-        if !is_wall(&Vec2::new(new_x, new_y)).0 {
-            player.position.x = new_x;
-            player.position.y = new_y;
-        }
-
-    }
-    if is_key_down(KeyCode::D) {
-
-        let new_x: f32 = player.position.x + f32::cos(player.camera_angle + RIGHT_ANGLE) * SPEED*delta_time;
-        let new_y: f32 = player.position.y + f32::sin(player.camera_angle + RIGHT_ANGLE) * SPEED*delta_time;
-
-        if !is_wall(&Vec2::new(new_x, new_y)).0 {
-            player.position.x = new_x;
-            player.position.y = new_y;
-        }
-    }
-
+    movement_keys(player);
     debug_key_input(player);
+
+    if is_key_pressed(KeyCode::F) {
+        *show_fps = !*show_fps;
+    }
 
     if is_key_pressed(KeyCode::Escape) {
         *mouse_lock = !*mouse_lock;
         set_cursor_grab(*mouse_lock);
         show_mouse(!*mouse_lock);
+    }
+}
+
+fn movement_keys(player: &mut Player) {
+
+    let delta_time: f32 = get_frame_time();
+
+    let ws_direction: f32 = (is_key_down(KeyCode::W) as i32 - is_key_down(KeyCode::S) as i32) as f32;
+    let ad_direction: f32 = (is_key_down(KeyCode::D) as i32 - is_key_down(KeyCode::A) as i32) as f32;
+
+    let mut new_position: Vec2 = Vec2::new(player.position.x, player.position.y);
+
+    new_position.x += ws_direction * f32::cos(player.camera_angle) * SPEED*delta_time;
+    new_position.y += ws_direction * f32::sin(player.camera_angle) * SPEED*delta_time;
+
+    new_position.x += ad_direction * f32::cos(player.camera_angle + RIGHT_ANGLE) * SPEED*delta_time;
+    new_position.y += ad_direction * f32::sin(player.camera_angle + RIGHT_ANGLE) * SPEED*delta_time;
+
+    if !is_wall(&new_position).0 {
+        player.position = new_position;
     }
 }
 
